@@ -11,8 +11,8 @@ extern void init(BOFHeader header);
 
 extern void invariant_check(BOFHeader header);
 
+void load_instrs(BOFFILE bof, BOFHeader header);
 
-
-
+void load_globals(BOFFILE bof, BOFHeader header);
 
 #endif
