@@ -27,84 +27,94 @@ static word_type LO;
 // Program counter
 static address_type PC;
 
-void load_bof(BOFFILE bof) // work on loading
+// Pre-Condition: bof represents a valid binary object file.
+// Post-Condition: Loads the file's instructions and global data
+// into memory and initializes registers.
+void load_bof(BOFFILE bof) //
 {
-    // load header
+    // Open header for reading
     BOFHeader bHeader = bof_read_header(bof);
 
-    // do some initialize stuff (reg/mem)
+    // Initialize registers and memory
     init(bHeader);
 
-    // invariant check
+    // Check to make sure everything was initialized properly.
     invariant_check(bHeader);
 
-    // load instructions
+    // Load program instructions
     load_instrs(bof, bHeader);
 
-    // load global data
+    // Load program global data
     load_globals(bof, bHeader);
 }
 
+// Pre-Condition: header represents a valid BOF header.
+// Post-Condition: Initializes memory to 0 and sets registers
+// to their proper starting values according to the header.
 void init(BOFHeader header) {
 
-    // Set all registers to 0.
+    // Set all registers to 0
     for (int i = 0; i < NUM_REGISTERS; i++)
     {
         GPR[i] = 0;
     }
 
-    // Set all memory to 0.
+    // Set all memory to 0
     for (int i = 0; i < MEMORY_SIZE_IN_WORDS; i++)
     {
         memory.words[i] = 0;
     }
 
-    // Set GP, FP, SP, and PC registers appropriately.
+    // Set GP, FP, and SP registers appropriately
     GPR[GP] = header.data_start_address;
     GPR[FP] = GPR[SP] = header.stack_bottom_addr;
+
+    // Properly initialize special registers
     PC = header.text_start_address;
     HI = 0;
     LO = 0;
 }
 
-void invariant_check(BOFHeader header)
+// Pre-Condition: Registers are properly initialized and updated.
+// Post-Condition: Checks the registers to make sure all invariants hold.
+void invariant_check()
 {
-    //check if 0 is <= gp
+    // Check if 0 is <= global pointer
     if (!(0 <= GPR[GP]))
     {
         bail_with_error("Global data starting address (%u) is less than 0!",
                         GPR[GP]);
     }
 
-    //check if gp < sp
+    // Check if global pointer < stack pointer
     if (!(GPR[GP] < GPR[SP]))
     {
         bail_with_error("Global data starting address (%u) is not less than the stack top address (%u)!",
                         GPR[GP], GPR[SP]);
     }
 
-    //check if sp <= fp
+    // Check if stack pointer <= frame pointer
     if (!(GPR[SP] <= GPR[FP]))
     {
         bail_with_error("Stack bottom address (%u) is not less than the stack top address (%u)!",
                         GPR[FP], GPR[SP]);
     }
 
-    //check that fp < memory_size
+    // Check that framep pointer < memory size
     if (!(GPR[FP] < MEMORY_SIZE_IN_WORDS))
     {
         bail_with_error("Stack bottom address (%u) is not less than the memory size (%u)!",
                         GPR[FP], MEMORY_SIZE_IN_WORDS);
     }
 
-    //check that 0 <= pc
+    // Check that 0 <= program counter
     if (!(0 <= PC))
     {
         bail_with_error("Program counter (%u) is less than zero!",
                         PC);
     }
 
-    //check that pc < memory_size
+    // Check that program counter < memory size
     if (!(PC < MEMORY_SIZE_IN_WORDS))
     {
         bail_with_error("Program counter (%u) is not less than the memory size (%u)!",
@@ -114,20 +124,32 @@ void invariant_check(BOFHeader header)
     if (DEBUG) printf("Invariant check passed!\n");
 }
 
+// Pre-Condition: bof and header are a valid binary object file and header, respectively
+// Post-Condition: Loads instructions from the BOF into program memory
 void load_instrs(BOFFILE bof, BOFHeader header) 
 {
+    // Calculate number of instructions using text length
     int num_instrs = (header.text_length / BYTES_PER_WORD);
+
+    // Loop through number of instructions, adding to memory array
     for (int i = 0; i < num_instrs; i++) 
     {
         memory.instrs[i] = instruction_read(bof);
     }
 }
 
+// Pre-Condition: bof and header are a valid binary object file and header, respectively
+// Post-Condition: Loads global data from the BOF into program memory
 void load_globals(BOFFILE bof, BOFHeader header)
 {
+    // Calculate number of global data value using data length
     int num_globals = (header.data_length / BYTES_PER_WORD);
+
+    // Use data start address to find where in the array to
+    // start saving global data to.
     int offset = (header.data_start_address / BYTES_PER_WORD);
 
+    // Loop through number of global data values, adding to memory array using offset.
     for (int i = 0; i < num_globals; i++)
     {
         memory.words[i + offset] = bof_read_word(bof);
