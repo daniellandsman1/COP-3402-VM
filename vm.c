@@ -244,6 +244,25 @@ void vm_execute_program(const char* bof_file) {
     }
 }
 
+void trace_instruction(bin_instr_t instr){
+
+    //Print PC
+    printf("PC: %d\n", PC);
+
+    //Print GPRs
+    printf("GPR[$gp]: %d GPR[$sp]: %d GPR[$fp]: %d GPR[$r3]: %d GPR[$r4]: %d\n", GPR[0], GPR[SP], GPR[FP], GPR[3], GPR[4]);
+    printf("GPR[$r5]: %d GPR[$r6]: %d GPR[$ra]: %d\n", GPR[5], GPR[6], GPR[RA]);
+
+    //Print Memory
+    printf("%d: %d ...\n", GPR[GP], memory.words[GPR[GP]]);
+    printf("%d: %d\n", GPR[SP], memory.words[GPR[SP]]);
+
+    //Print Current Instruction
+    printf("==> %d: ", PC - 1);
+    instruction_print_assembly(stdout, &instr);
+    printf("\n");
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s [-p] <bof_file>\n", argv[0]);
