@@ -200,8 +200,43 @@ void execute_instruction(bin_instr_t instr) {
 
             break;
         case immed_instr_type:
+            switch (instr.immed.opcode) {
+                case OP_ADDI:
+                    GPR[instr.immed.reg] += machine_types_sgnExt(instr.immed.immed);
+                    break;
+                case OP_ANDI:
+                    GPR[instr.immed.reg] &= machine_types_zeroExt(instr.immed.immed);
+                    break;
+                case OP_BNE:
+                    if (GPR[instr.immed.reg] != GPR[SP]) {
+                        PC += machine_types_formOffset(instr.immed.immed);
+                    }
+                    break;
+                case OP_BEQ:
+                    if (GPR[instr.immed.reg] == GPR[SP]) {
+                        PC += machine_types_formOffset(instr.immed.immed);
+                    }
+                    break;
+                // Other immediate instructions (BORI, XORI, etc.)
+                default:
+                    bail_with_error("Immediate instruction opcode (%d) is invalid!", instr.immed.opcode);
+            }
             break;
         case jump_instr_type:
+            switch(instr.jump.opcode) {
+                case JMPA:
+                    PC = formAddress(PC - 1, instr.jump.addr);
+                    break;
+                case CALL:
+                    GPR[RA] = PC;
+                    PC = formAddress(PC - 1, instr.jump.addr);
+                    break;
+                case RTN:
+                    PC = GPR[RA];
+                    break;
+                default:
+                    bail_with_error("Jump instruction opcode (%d) is invalid!", instr.jump.opcode);
+            }
             break;
         case syscall_instr_type:
             break;
