@@ -156,11 +156,13 @@ void execute_instruction(bin_instr_t instr) {
                     }
 
                     LO = memory.words[GPR[SP]] / 
-
+                    (memory.words[GPR[reg] + machine_types_formOffset(o)]);
+                    HI = memory.words[GPR[SP]] % 
+                    (memory.words[GPR[reg] + machine_types_formOffset(o)]);
                     break;
 
                 case CFHI_F:
-
+                    
                     break;
 
                 case CFLO_F:
