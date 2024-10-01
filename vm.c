@@ -131,11 +131,11 @@ void execute_instruction(bin_instr_t instr) {
             arg_type arg = instr.othc.arg;
             func_type func = instr.othc.func;
 
-            switch(func)) {
+            switch(func) {
 
                 case LIT_F:
                     memory.words[GPR[reg] + machine_types_formOffset(offset)] =
-                    machine_types_sgnExt(i);
+                    machine_types_sgnExt(arg);
                     break;
                 
                 case ARI_F:
