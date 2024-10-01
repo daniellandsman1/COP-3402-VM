@@ -8,6 +8,9 @@
 
 #define MEMORY_SIZE 32768
 
+// this should go in the machine_main.c file
+bool trace_program = true;
+
 // Memory and registers
 union memory_t {
     int words[MEMORY_SIZE];
@@ -50,8 +53,9 @@ void execute_instruction(bin_instr_t instr) {
             offset_type ot = instr.comp.ot;
             reg_num_type s = instr.comp.rs;
             offset_type os = instr.comp.os;
+            func_type func = instr.comp.func;
 
-            switch(instr.comp.func) {
+            switch(func) {
 
                 case NOP_F:
                     break;
@@ -123,27 +127,28 @@ void execute_instruction(bin_instr_t instr) {
         case other_comp_instr_type:
 
             reg_num_type reg = instr.othc.reg;
-            offset_type o = instr.othc.offset;
-            arg_type i = instr.othc.arg;
+            offset_type offset = instr.othc.offset;
+            arg_type arg = instr.othc.arg;
+            func_type func = instr.othc.func;
 
-            switch(instr.othc.func) {
+            switch(func)) {
 
                 case LIT_F:
-                    memory.words[GPR[reg] + machine_types_formOffset(o)] =
+                    memory.words[GPR[reg] + machine_types_formOffset(offset)] =
                     machine_types_sgnExt(i);
                     break;
                 
                 case ARI_F:
-                    GPR[reg] = (GPR[reg] + machine_types_sgnExt(i));
+                    GPR[reg] = (GPR[reg] + machine_types_sgnExt(arg));
                     break;
 
                 case SRI_F:
-                    GPR[reg] = (GPR[reg] - machine_types_sgnExt(i));
+                    GPR[reg] = (GPR[reg] - machine_types_sgnExt(arg));
                     break;
 
                 case MUL_F:
                     long long int res = memory.words[GPR[SP]] * 
-                    (memory.words[GPR[reg] + machine_types_formOffset(o)]);
+                    (memory.words[GPR[reg] + machine_types_formOffset(offset)]);
 
                     LO = (res & 0xFFFFFFFF);
                     HI = (res >> 32);
@@ -151,54 +156,91 @@ void execute_instruction(bin_instr_t instr) {
 
                 case DIV_F:
 
-                    if (memory.words[GPR[reg] + machine_types_formOffset(o)] == 0) {
+                    if (memory.words[GPR[reg] + machine_types_formOffset(offset)] == 0) {
                         bail_with_error("Division by 0 encountered!");
                     }
 
                     LO = memory.words[GPR[SP]] / 
-                    (memory.words[GPR[reg] + machine_types_formOffset(o)]);
+                    (memory.words[GPR[reg] + machine_types_formOffset(offset)]);
                     HI = memory.words[GPR[SP]] % 
-                    (memory.words[GPR[reg] + machine_types_formOffset(o)]);
+                    (memory.words[GPR[reg] + machine_types_formOffset(offset)]);
                     break;
 
                 case CFHI_F:
-                    
+                    memory.words[GPR[reg] + machine_types_formOffset(offset)] = HI;
                     break;
 
                 case CFLO_F:
-
+                    memory.words[GPR[reg] + machine_types_formOffset(offset)] = LO;
                     break;
 
                 case SLL_F:
-
+                    memory.uwords[GPR[reg] + machine_types_formOffset(offset)] = 
+                    memory.uwords[GPR[SP]] << arg;
                     break;
 
                 case SRL_F:
-
+                    memory.uwords[GPR[reg] + machine_types_formOffset(offset)] =
+                    memory.uwords[GPR[SP]] >> arg;
                     break;
 
                 case JMP_F:
-
+                    PC = memory.uwords[GPR[reg] + machine_types_formOffset(offset)];
                     break;
 
                 case CSI_F:
-
+                    GPR[RA] = PC;
+                    PC = memory.words[GPR[reg] + machine_types_formOffset(offset)];
                     break;
 
                 case JREL_F:
-
+                    PC = ((PC - 1) + machine_types_formOffset(arg));
                     break;
 
                 case SYS_F:
 
+                    reg_num_type reg = instr.syscall.reg;
+                    offset_type o = instr.syscall.offset;
+                    syscall_type code = instr.syscall.code;
+
+                    switch(code) {
+
+                        case exit_sc:
+                            exit(machine_types_sgnExt(o));
+                            break;
+
+                        case print_str_sc:
+                            memory.words[GPR[SP]] = 
+                            printf("%s", (char*)&memory.words[GPR[reg] + machine_types_formOffset(o)]);
+                            break;
+
+                        case print_char_sc:
+                            memory.words[GPR[SP]] = 
+                            fputc(memory.words[GPR[reg] + machine_types_formOffset(o)], stdout);
+                            break;
+
+                        case read_char_sc:
+                            memory.words[GPR[reg] + machine_types_formOffset(o)] =
+                            getc(stdin);
+                            break;
+
+                        case start_tracing_sc:
+                            trace_program = true;
+                            break;
+
+                        case stop_tracing_sc:
+                            trace_program = false;
+                            break;
+                    }
                     break;
 
                 default:
-                    bail_with_error("Other computational function code (%d) is invalid!", instr.othc.func);
+                    bail_with_error("Other computational function code (%hu) is invalid!", instr.othc.func);
                     break;
             }
 
             break;
+
         case immed_instr_type:
             switch (instr.immed.opcode) {
                 case OP_ADDI:
@@ -222,6 +264,7 @@ void execute_instruction(bin_instr_t instr) {
                     bail_with_error("Immediate instruction opcode (%d) is invalid!", instr.immed.opcode);
             }
             break;
+
         case jump_instr_type:
             switch(instr.jump.opcode) {
                 case JMPA:
@@ -238,25 +281,16 @@ void execute_instruction(bin_instr_t instr) {
                     bail_with_error("Jump instruction opcode (%d) is invalid!", instr.jump.opcode);
             }
             break;
-        case syscall_instr_type:
-            break;
-        case error_instr_type:
-            break;
 
-        case OP_ADDI:
-            GPR[instr.reg] += instr.immediate;
+        case error_instr_type:
+            bail_with_error("Opcode (%hu) is invalid!", instr.comp.op);
             break;
-        case OP_EXIT:
-            exit(instr.offset);
-        default:
-            fprintf(stderr, "Unknown opcode: %d\n", instr.opcode);
-            exit(1);
     }
 }
 
 // VM execution
 void vm_execute_program(const char* bof_file) {
-    BOFFILE* bof = bof_read_open(bof_file);
+    BOFFILE bof = bof_read_open(bof_file);
     if (!bof) {
         fprintf(stderr, "Error opening BOF file: %s\n", bof_file);
         exit(1);

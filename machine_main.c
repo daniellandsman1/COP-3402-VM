@@ -1,13 +1,3 @@
-// Daniel Landsman
-/*
-
-so far we got: 
-machine_main.c and h
-machine.c and h
-
-
-
-*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,16 +6,15 @@ machine.c and h
 #include "bof.h"
 #include "utilities.h"
 
+// we can remove all this debug stuff when we're done
 #define DEBUG 1
 
-// BOF loading module?
-// memory module? (maybe registers as well)?
-
+// we can remove this after we're done
 void testPrint(int argcP, char* argvP[]);
 
 int main(int argc, char* argv[])
 {
-
+    bool trace_program = true;
     bool print_assembly = false;
 
     if (DEBUG) 
@@ -43,8 +32,14 @@ int main(int argc, char* argv[])
     if (DEBUG) printf("DEBUG: argv[1] is %s\n", argv[1]);
     BOFFILE bof = bof_read_open(argv[1]);
     load_bof(bof);
+
+    // if (print_assembly)
+        // print program out
+
+    // machine run function, actual function body should be in machine.c
 }
 
+// we can remove this after we're done
 void testPrint(int argcP, char* argvP[])
 {
     printf("There are %d args. They are:\n", argcP);
