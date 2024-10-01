@@ -201,7 +201,7 @@ void execute_instruction(bin_instr_t instr) {
 
                     reg_num_type reg = instr.syscall.reg;
                     offset_type o = instr.syscall.offset;
-                    syscall_type code = instr.syscall.code;
+                    syscall_type code = instruction_syscall_number(instr);
 
                     switch(code) {
 

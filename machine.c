@@ -27,6 +27,8 @@ static word_type LO;
 // Program counter
 static address_type PC;
 
+static unsigned int num_instrs;
+
 // Pre-Condition: bof represents a valid binary object file.
 // Post-Condition: Loads the file's instructions and global data
 // into memory and initializes registers.
@@ -82,28 +84,28 @@ void invariant_check()
     // Check if 0 is <= global pointer
     if (!(0 <= GPR[GP]))
     {
-        bail_with_error("Global data starting address (%u) is less than 0!",
+        bail_with_error("Global data starting address (%d) is less than 0!",
                         GPR[GP]);
     }
 
     // Check if global pointer < stack pointer
     if (!(GPR[GP] < GPR[SP]))
     {
-        bail_with_error("Global data starting address (%u) is not less than the stack top address (%u)!",
+        bail_with_error("Global data starting address (%d) is not less than the stack top address (%d)!",
                         GPR[GP], GPR[SP]);
     }
 
     // Check if stack pointer <= frame pointer
     if (!(GPR[SP] <= GPR[FP]))
     {
-        bail_with_error("Stack bottom address (%u) is not less than the stack top address (%u)!",
+        bail_with_error("Stack bottom address (%d) is not less than the stack top address (%d)!",
                         GPR[FP], GPR[SP]);
     }
 
     // Check that framep pointer < memory size
     if (!(GPR[FP] < MEMORY_SIZE_IN_WORDS))
     {
-        bail_with_error("Stack bottom address (%u) is not less than the memory size (%u)!",
+        bail_with_error("Stack bottom address (%d) is not less than the memory size (%d)!",
                         GPR[FP], MEMORY_SIZE_IN_WORDS);
     }
 
@@ -117,7 +119,7 @@ void invariant_check()
     // Check that program counter < memory size
     if (!(PC < MEMORY_SIZE_IN_WORDS))
     {
-        bail_with_error("Program counter (%u) is not less than the memory size (%u)!",
+        bail_with_error("Program counter (%u) is not less than the memory size (%d)!",
                         PC, MEMORY_SIZE_IN_WORDS);
     }
 
@@ -128,8 +130,8 @@ void invariant_check()
 // Post-Condition: Loads instructions from the BOF into program memory
 void load_instrs(BOFFILE bof, BOFHeader header) 
 {
-    // Calculate number of instructions using text length
-    int num_instrs = (header.text_length / BYTES_PER_WORD);
+    // Number of instructions is simply text length since word addressed.
+    num_instrs = header.text_length;
 
     // Loop through number of instructions, adding to memory array
     for (int i = 0; i < num_instrs; i++) 
@@ -142,16 +144,32 @@ void load_instrs(BOFFILE bof, BOFHeader header)
 // Post-Condition: Loads global data from the BOF into program memory
 void load_globals(BOFFILE bof, BOFHeader header)
 {
-    // Calculate number of global data value using data length
-    int num_globals = (header.data_length / BYTES_PER_WORD);
+    // Length of global data is the number of global data values.
+    int num_globals = header.data_length;
 
     // Use data start address to find where in the array to
     // start saving global data to.
-    int offset = (header.data_start_address / BYTES_PER_WORD);
+    int offset = header.data_start_address;
 
     // Loop through number of global data values, adding to memory array using offset.
     for (int i = 0; i < num_globals; i++)
     {
         memory.words[i + offset] = bof_read_word(bof);
+    }
+}
+
+void vm_print_program(FILE* out)
+{
+    instruction_print_table_heading(out);
+    print_all_instrs(out);
+    // need to figure out how to print global data, see disasm files for some guidance
+    // and check .lst files for what we need to match
+}
+
+void print_all_instrs(FILE* out)
+{
+    for (int i = 0; i < num_instrs; i++)
+    {
+        instruction_print(out, i, memory.instrs[i]);
     }
 }

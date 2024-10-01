@@ -33,10 +33,13 @@ int main(int argc, char* argv[])
     BOFFILE bof = bof_read_open(argv[1]);
     load_bof(bof);
 
-    // if (print_assembly)
-        // print program out
+    if (print_assembly)
+    {
+        // call print program function
+    }
 
     // machine run function, actual function body should be in machine.c
+    return EXIT_SUCCESS;
 }
 
 // we can remove this after we're done
