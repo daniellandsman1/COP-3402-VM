@@ -21,6 +21,9 @@ union memory_t {
 int PC = 0, HI = 0, LO = 0;
 int GPR[8]; // General-purpose registers
 
+//Register names for tracing
+const char * reg_names[8] = {"$gp", "$sp", "$fp", "$r3", "$r4", "$r5", "$r6", "$ra"};
+
 // VM print function (-p flag)
 void vm_print_program(const char* bof_file) {
     BOFFILE bof = bof_read_open(bof_file);
@@ -309,8 +312,25 @@ void vm_execute_program(const char* bof_file) {
     while (1) {
         instruction_t instr = memory.instructions[PC];
         PC++;
+
+        //If tracing is enabled, print trace before executing instruction
+        if(trace_program){
+            trace_instruction(instr);
+        }
+        
         execute_instruction(instr);
+
+        //If tracing is enabled, print trace after executing instruction
+        if(trace_program){
+            trace_instruction(instr);
+        }
     }
+}
+
+bin_instr_t fetch_instruction(){
+    bin_instr_t instr = memory.instructions[PC];
+    PC++;
+    return instr;
 }
 
 void trace_instruction(bin_instr_t instr){
