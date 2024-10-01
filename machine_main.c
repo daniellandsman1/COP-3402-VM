@@ -23,18 +23,24 @@ int main(int argc, char* argv[])
         testPrint(argc, argv);
     }
 
-    if (argc == 2 && strcmp(argv[1], "-p") == 0)
+    if (argc == 3 && strcmp(argv[1], "-p") == 0)
     {
         print_assembly = true;
         if (DEBUG) printf("DEBUG: Print mode activated\n");
     }
 
+    BOFFILE bof;
+
+    if (print_assembly) bof = bof_read_open(argv[2]);
+    else bof = bof_read_open(argv[1]);
+
     if (DEBUG) printf("DEBUG: argv[1] is %s\n", argv[1]);
-    BOFFILE bof = bof_read_open(argv[1]);
+
     load_bof(bof);
 
     if (print_assembly)
     {
+        vm_print_program(stdout);
         // call print program function
     }
 

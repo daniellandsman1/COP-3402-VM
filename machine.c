@@ -158,6 +158,10 @@ void load_globals(BOFFILE bof, BOFHeader header)
     }
 }
 
+// Pre-Condition: Instructions and global data have been properly loaded
+// into program memory.
+// Post-Condition: Prints table heading, assembly instructions, and global
+// data in program without executing instructions (-p option).
 void vm_print_program(FILE* out)
 {
     instruction_print_table_heading(out);
@@ -166,6 +170,8 @@ void vm_print_program(FILE* out)
     // and check .lst files for what we need to match
 }
 
+// Pre-Condition: Instructions have been properly loaded into program memory.
+// Post-Condition: Prints the address and assembly form of all instructions in memory.
 void print_all_instrs(FILE* out)
 {
     for (int i = 0; i < num_instrs; i++)
