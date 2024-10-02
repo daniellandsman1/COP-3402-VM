@@ -8,7 +8,7 @@
 #include "utilities.h"
 
 // we can remove all this debug stuff when we're done
-#define DEBUG 0
+#define DEBUG 1
 
 // we can remove this after we're done
 void testPrint(int argcP, char* argvP[]);
@@ -51,6 +51,7 @@ int main(int argc, char* argv[])
         {
             bin_instr_t instr = memory.instrs[PC];
         PC++;
+
 
         //If tracing is enabled, print trace before executing instruction
         if(trace_program){

@@ -8,7 +8,14 @@
 #include "utilities.h"
 
 #define MAX_PRINT_WIDTH 59
-#define DEBUG 0
+#define DEBUG 1
+
+word_type GPR[NUM_REGISTERS];
+address_type PC = 0;
+word_type HI = 0;
+word_type LO = 0;
+unsigned int num_instrs = 0;
+unsigned int num_globals = 0;
 
 // Pre-Condition: bof represents a valid binary object file.
 // Post-Condition: Loads the file's instructions and global data
@@ -145,8 +152,11 @@ void load_globals(BOFFILE bof, BOFHeader header)
 // data in program without executing instructions (-p option).
 void vm_print_program(FILE* out)
 {
+    if (DEBUG) printf("DEBUG: printing table heading\n");
     instruction_print_table_heading(out);
+    if (DEBUG) printf("DEBUG: printing instructions\n");
     print_all_instrs(out);
+    if (DEBUG) printf("DEBUG: printing global data\n");
     print_global_data(out);
     // need to figure out how to print global data, see disasm files for some guidance
     // and check .lst files for what we need to match
@@ -308,8 +318,8 @@ void execute_instruction(bin_instr_t instr, bool trace_flag)
             arg_type arg = instr.othc.arg;
             func_type func_1 = instr.othc.func;
 
-            switch(func_1) {
-
+            switch(func_1) 
+            {
                 case LIT_F:
                     memory.words[GPR[reg] + machine_types_formOffset(offset)] =
                     machine_types_sgnExt(arg);
@@ -375,75 +385,53 @@ void execute_instruction(bin_instr_t instr, bool trace_flag)
                     break;
 
                 case SYS_F:
-
-                    reg_num_type reg = instr.syscall.reg;
-                    offset_type o = instr.syscall.offset;
-                    syscall_type code = instruction_syscall_number(instr);
-
-                    switch(code) {
-
-                        case exit_sc:
-                            exit(machine_types_sgnExt(o));
-                            break;
-
-                        case print_str_sc:
-                            memory.words[GPR[SP]] = 
-                            printf("%s", (char*)&memory.words[GPR[reg] + machine_types_formOffset(o)]);
-                            break;
-
-                        case print_char_sc:
-                            memory.words[GPR[SP]] = 
-                            fputc(memory.words[GPR[reg] + machine_types_formOffset(o)], stdout);
-                            break;
-
-                        case read_char_sc:
-                            memory.words[GPR[reg] + machine_types_formOffset(o)] =
-                            getc(stdin);
-                            break;
-
-                        case start_tracing_sc:
-                            trace_flag = true;
-                            break;
-
-                        case stop_tracing_sc:
-                            trace_flag = false;
-                            break;
-                    }
+                    // Should never happen, all other computational instructions
+                    // with this func code should be returned as syscall_instr_type
+                    // by instruction_type() function.
                     break;
 
                 default:
                     bail_with_error("Other computational function code (%hu) is invalid!", instr.othc.func);
                     break;
             }
-
-            break;
+        break;
 
         case immed_instr_type:
-            switch (instr.immed.op) {
+
+            switch (instr.immed.op) 
+            {
                 case ADDI_O:
                     GPR[instr.immed.reg] += machine_types_sgnExt(instr.immed.immed);
                     break;
+
                 case ANDI_O:
                     GPR[instr.immed.reg] &= machine_types_zeroExt(instr.immed.immed);
                     break;
+
                 case BNE_O:
-                    if (GPR[instr.immed.reg] != GPR[SP]) {
+                    if (GPR[instr.immed.reg] != GPR[SP]) 
+                    {
                         PC += machine_types_formOffset(instr.immed.immed);
                     }
                     break;
+
                 case BEQ_O:
-                    if (GPR[instr.immed.reg] == GPR[SP]) {
+                    if (GPR[instr.immed.reg] == GPR[SP]) 
+                    {
                         PC += machine_types_formOffset(instr.immed.immed);
                     }
                     break;
+
                 // Other immediate instructions (BORI, XORI, etc.)
                 default:
                     bail_with_error("Immediate instruction opcode (%d) is invalid!", instr.immed.op);
             }
-            break;
+        break;
 
         case jump_instr_type:
-            switch(instr.jump.op) {
+
+            switch(instr.jump.op) 
+            {
                 case JMPA_O:
                     PC = machine_types_formAddress(PC - 1, instr.jump.addr);
                     break;
@@ -457,7 +445,47 @@ void execute_instruction(bin_instr_t instr, bool trace_flag)
                 default:
                     bail_with_error("Jump instruction opcode (%d) is invalid!", instr.jump.op);
             }
-            break;
+        break;
+
+        case syscall_instr_type:
+
+            reg_num_type r = instr.syscall.reg;
+            offset_type o = instr.syscall.offset;
+            syscall_type code = instruction_syscall_number(instr);
+
+            switch(code) 
+            {
+                case exit_sc:
+                    exit(machine_types_sgnExt(o));
+                    break;
+
+                case print_str_sc:
+                    memory.words[GPR[SP]] = 
+                    printf("%s", (char*)&memory.words[GPR[r] + machine_types_formOffset(o)]);
+                    break;
+
+                case print_char_sc:
+                    memory.words[GPR[SP]] = 
+                    fputc(memory.words[GPR[r] + machine_types_formOffset(o)], stdout);
+                    break;
+
+                case read_char_sc:
+                    memory.words[GPR[r] + machine_types_formOffset(o)] =
+                    getc(stdin);
+                    break;
+
+                case start_tracing_sc:
+                    trace_flag = true;
+                    break;
+
+                case stop_tracing_sc:
+                    trace_flag = false;
+                    break;
+
+                default:
+                    bail_with_error("System call instruction opcode (%d) is invalid!", instr.syscall.op);
+            }
+        break;
 
         case error_instr_type:
             bail_with_error("Opcode (%hu) is invalid!", instr.comp.op);
