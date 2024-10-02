@@ -4,19 +4,20 @@
 #include <stdbool.h>
 #include "machine.h"
 #include "bof.h"
+#include "instruction.h"
 #include "utilities.h"
 
 // we can remove all this debug stuff when we're done
-#define DEBUG 1
+#define DEBUG 0
 
 // we can remove this after we're done
 void testPrint(int argcP, char* argvP[]);
 
-int main(int argc, char* argv[])
-{
     bool trace_program = true;
     bool print_assembly = false;
 
+int main(int argc, char* argv[])
+{
     if (DEBUG) 
     {
         printf("DEBUG ON\n");
@@ -41,7 +42,28 @@ int main(int argc, char* argv[])
     if (print_assembly)
     {
         vm_print_program(stdout);
-        // call print program function
+    }
+
+    else
+    {
+        // Execute program
+        while (1) 
+        {
+            bin_instr_t instr = memory.instrs[PC];
+        PC++;
+
+        //If tracing is enabled, print trace before executing instruction
+        if(trace_program){
+            trace_instruction(instr);
+        }
+        
+        execute_instruction(instr, trace_program);
+
+        //If tracing is enabled, print trace after executing instruction
+        if(trace_program){
+            trace_instruction(instr);
+        }
+    }
     }
 
     // machine run function, actual function body should be in machine.c
