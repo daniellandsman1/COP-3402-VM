@@ -14,12 +14,11 @@ void print_global_data(FILE* out)
 		{
 			num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
 			no_dots_yet = true;
-		} else
-		{
+		} else {
 			if (no_dots_yet)
 			{
-				num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
-				num_chars += fprintf(out, "...");
+				// num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+				num_chars += fprintf(out, "...\n");
 				no_dots_yet = false;
 			}
 		}
