@@ -28,6 +28,8 @@ extern address_type PC;
 extern unsigned int num_instrs;
 extern unsigned int num_globals;
 
+extern bool trace_program;
+
 // Pre-Condition: bof represents a valid binary object file.
 // Post-Condition: Loads the file's instructions and global data
 // into memory and initializes registers.
@@ -63,14 +65,16 @@ extern void print_all_instrs(FILE* out);
 
 extern void print_global_data(FILE* out);
 
+extern void print_AR(FILE* out);
+
 extern void trace_instruction(bin_instr_t instr);
 
 extern bin_instr_t fetch_instruction();
 
-extern void execute_instruction(bin_instr_t instr, bool trace_flag);
+extern void execute_instruction(bin_instr_t instr);
 
 extern void print_state();
 
-extern void vm_run_program(bool trace_flag);
+extern void vm_run_program();
 
 #endif

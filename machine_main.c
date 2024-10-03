@@ -13,7 +13,7 @@
 // we can remove this after we're done
 void testPrint(int argcP, char* argvP[]);
 
-bool trace_program = true;
+//bool trace_program = true;
 bool print_assembly = false;
 
 int main(int argc, char* argv[])
@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
 
     else
     {
-        vm_run_program(trace_program);
+        vm_run_program();
     }
 
     return EXIT_SUCCESS;

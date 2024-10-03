@@ -17,6 +17,7 @@ word_type HI = 0;
 word_type LO = 0;
 unsigned int num_instrs = 0;
 unsigned int num_globals = 0;
+bool trace_program = true;
 
 // Pre-Condition: bof represents a valid binary object file.
 // Post-Condition: Loads the file's instructions and global data
@@ -186,11 +187,11 @@ void print_global_data(FILE* out)
 {
     int global_start = GPR[GP];
     int global_end = global_start + num_globals;
-    
+
     int num_chars = 0;
     bool printing_dots = false;
-    
-    for (int i = global_start; i < global_end; i++)
+
+    for (int i = global_start; i <= global_end; i++)
     {
         if (memory.words[i] != 0)
         {
@@ -206,9 +207,11 @@ void print_global_data(FILE* out)
         {
             if (!printing_dots)
             {
-                if (i + 1 < global_end && memory.words[i + 1] == 0)
+                //printf("HEY! i + 1 is %d AND NEXT MEM IS %d\n", i + 1, memory.words[i+1]);
+                //printf("GLOBAL END IS %d\n", global_end);
+                if (memory.words[i + 1] == 0)
                 {
-                    num_chars += fprintf(out, "%8d: %d\t...", i, memory.words[i]);
+                    num_chars += fprintf(out, "%8d: %d\n\t\t...", i, memory.words[i]);
                     printing_dots = true;
                 }
                 else
@@ -217,14 +220,65 @@ void print_global_data(FILE* out)
                 }
             }
         }
-        
+
         if (num_chars > MAX_PRINT_WIDTH)
         {
             newline(out);
             num_chars = 0;
         }
     }
-    
+
+    if (num_chars > 0)
+    {
+        newline(out);
+    }
+}
+
+void print_AR(FILE* out)
+{
+    int AR_start = GPR[SP];
+    int AR_end = GPR[FP];
+
+    int num_chars = 0;
+    bool printing_dots = false;
+
+    for (int i = AR_start; i <= AR_end; i++)
+    {
+        if (memory.words[i] != 0)
+        {
+            if (printing_dots)
+            {
+                newline(out);
+                num_chars = 0;
+                printing_dots = false;
+            }
+            num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+        }
+        else
+        {
+            if (!printing_dots)
+            {
+                //printf("HEY! i + 1 is %d AND NEXT MEM IS %d\n", i + 1, memory.words[i+1]);
+                //printf("GLOBAL END IS %d\n", global_end);
+                if (i < AR_end && memory.words[i + 1] == 0)
+                {
+                    num_chars += fprintf(out, "%8d: %d	        ...", i, memory.words[i]);
+                    printing_dots = true;
+                }
+                else
+                {
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+                }
+            }
+        }
+
+        if (num_chars > MAX_PRINT_WIDTH)
+        {
+            newline(out);
+            num_chars = 0;
+        }
+    }
+
     if (num_chars > 0)
     {
         newline(out);
@@ -251,8 +305,10 @@ void print_state()
     printf("GPR[$r5]: %d   GPR[$r6]: %d   GPR[$ra]: %d\n", GPR[5], GPR[6], GPR[RA]);
 
     //Print Memory
-    printf("%d: %d ...\n", GPR[GP], memory.words[GPR[GP]]);
-    printf("%d: %d\n", GPR[SP], memory.words[GPR[SP]]);
+    print_global_data(stdout);
+    print_AR(stdout);
+    //printf("%d: %d ...\n", GPR[GP], memory.words[GPR[GP]]);
+    //printf("%d: %d\n", GPR[SP], memory.words[GPR[SP]]);
 
     // Print newline
     printf("\n");
@@ -266,7 +322,7 @@ bin_instr_t fetch_instruction()
 }
 
 // Fetch-execute cycle
-void execute_instruction(bin_instr_t instr, bool trace_flag)
+void execute_instruction(bin_instr_t instr)
 {
 
     instr_type type = instruction_type(instr);
@@ -537,7 +593,10 @@ void execute_instruction(bin_instr_t instr, bool trace_flag)
             switch(code) 
             {
                 case exit_sc:
-                    printf("==>      %d: %s\n", PC - 1, instruction_assembly_form(PC - 1, instr));
+                    if (trace_program)
+                    {
+                        printf("==>      %d: %s\n", PC - 1, instruction_assembly_form(PC - 1, instr));
+                    }
                     exit(machine_types_sgnExt(o));
                     break;
 
@@ -557,11 +616,12 @@ void execute_instruction(bin_instr_t instr, bool trace_flag)
                     break;
 
                 case start_tracing_sc:
-                    trace_flag = true;
+                    trace_program = true;
                     break;
 
                 case stop_tracing_sc:
-                    trace_flag = false;
+                    trace_program = false;
+                    printf("==>      %d: %s\n", PC - 1, instruction_assembly_form(PC - 1, instr));
                     break;
 
                 default:
@@ -575,9 +635,9 @@ void execute_instruction(bin_instr_t instr, bool trace_flag)
     }
 }
 
-void vm_run_program(bool trace_flag)
+void vm_run_program()
 {
-    if (trace_flag)
+    if (trace_program)
     {
         print_state();
     }
@@ -589,8 +649,8 @@ void vm_run_program(bool trace_flag)
     while (true)
     {
         cur_instr = fetch_instruction();
-        execute_instruction(cur_instr, trace_flag);
-        trace_instruction(cur_instr);
+        execute_instruction(cur_instr);
+        if (trace_program) trace_instruction(cur_instr);
         invariant_check();
     }
 }
