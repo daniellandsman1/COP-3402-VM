@@ -190,57 +190,83 @@ void print_global_data(FILE* out)
 
     int num_chars = 0;
     bool printing_dots = false;
-    int consecutive_zeros = 0;
     
-    const char* dots = "...";
+    const char* dots = "...";  // String for dots
 
     for (int i = global_start; i <= global_end; i++)
     {
-        if (memory.words[i] != 0 || i == global_start || i == global_end)
+        if (memory.words[i] != 0)
         {
             if (printing_dots)
             {
-                if (num_chars > 0)
-                {
-                    newline(out);
-                }
-                num_chars = 0;
+                num_chars = 0;  // Reset num_chars when switching from dots to numbers
                 printing_dots = false;
             }
 
+            // Check length of the string that would be printed
             int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
 
             if (num_chars + len > MAX_PRINT_WIDTH)
             {
-                newline(out);
-                num_chars = 0;
+                newline(out);  // Print newline if the line exceeds the max width
+                num_chars = 0;  // Reset num_chars
             }
 
             num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
-            consecutive_zeros = 0;
         }
         else
         {
-            consecutive_zeros++;
-            
-            if (consecutive_zeros == 2 && !printing_dots)
+            if (!printing_dots)
             {
-                if (num_chars + 11 > MAX_PRINT_WIDTH) // 11 is the length of "..."
+                if (memory.words[i + 1] == 0 && i + 1 <= global_end)
                 {
-                    newline(out);
-                    num_chars = 0;
+                    // Print the last zero value
+                    int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
+                    
+                    if (num_chars + len > MAX_PRINT_WIDTH)
+                    {
+                        newline(out);
+                        num_chars = 0;
+                    }
+
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+
+                    if (num_chars > MAX_PRINT_WIDTH)
+                    {
+                        newline(out);
+                        num_chars = 0;
+                    }
+
+                    // Print dots
+                    fprintf(out, "%11s     ", dots);
+                    printing_dots = true;
+                    num_chars = 0;  // Reset after printing dots
                 }
-                
-                fprintf(out, "%s\t", dots);
-                num_chars += 11;
-                printing_dots = true;
+                else
+                {
+                    int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
+                    
+                    if (num_chars + len > MAX_PRINT_WIDTH)
+                    {
+                        newline(out);
+                        num_chars = 0;
+                    }
+
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+                }
             }
+        }
+
+        if (num_chars > MAX_PRINT_WIDTH)
+        {
+            newline(out);
+            num_chars = 0;
         }
     }
 
     if (num_chars > 0)
     {
-        newline(out);
+        newline(out);  // Ensure a final newline if there's leftover content
     }
 }
 
