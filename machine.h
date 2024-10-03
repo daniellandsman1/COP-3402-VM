@@ -8,7 +8,7 @@
 #define MEMORY_SIZE_IN_WORDS 32768
 
 // Memory
-static union mem_u
+extern union mem_u
 {
 word_type words[MEMORY_SIZE_IN_WORDS];
 uword_type uwords[MEMORY_SIZE_IN_WORDS];
@@ -68,5 +68,9 @@ extern void trace_instruction(bin_instr_t instr);
 extern bin_instr_t fetch_instruction();
 
 extern void execute_instruction(bin_instr_t instr, bool trace_flag);
+
+extern void print_state();
+
+extern void vm_run_program(bool trace_flag);
 
 #endif

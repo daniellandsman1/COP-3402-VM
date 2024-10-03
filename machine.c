@@ -8,8 +8,9 @@
 #include "utilities.h"
 
 #define MAX_PRINT_WIDTH 59
-#define DEBUG 1
+#define DEBUG 0
 
+union mem_u memory;
 word_type GPR[NUM_REGISTERS];
 address_type PC = 0;
 word_type HI = 0;
@@ -22,8 +23,15 @@ unsigned int num_globals = 0;
 // into memory and initializes registers.
 void load_bof(BOFFILE bof) //
 {
+
     // Open header for reading
     BOFHeader bHeader = bof_read_header(bof);
+    if (DEBUG) printf("DEBUG: bHeader data length in load_bof is %d\n", bHeader.data_length);
+    if (DEBUG) printf("DEBUG: bHeader data start address in load_bof is %d\n", bHeader.data_start_address);
+    if (DEBUG) printf("DEBUG: bHeader magic in load_bof is %s\n", bHeader.magic);
+    if (DEBUG) printf("DEBUG: bHeader stack bottom address in load_bof is %d\n", bHeader.stack_bottom_addr);
+    if (DEBUG) printf("DEBUG: bHeader text length in load_bof is %d\n", bHeader.text_length);
+    if (DEBUG) printf("DEBUG: bHeader text start address in load_bof is %d\n", bHeader.text_start_address);
 
     // Initialize registers and memory
     init(bHeader);
@@ -36,6 +44,7 @@ void load_bof(BOFFILE bof) //
 
     // Load program global data
     load_globals(bof, bHeader);
+
 }
 
 // Pre-Condition: header represents a valid BOF header.
@@ -86,8 +95,8 @@ void invariant_check()
     // Check if stack pointer <= frame pointer
     if (!(GPR[SP] <= GPR[FP]))
     {
-        bail_with_error("Stack bottom address (%d) is not less than the stack top address (%d)!",
-                        GPR[FP], GPR[SP]);
+        bail_with_error("Stack top address (%d) is not less than or equal to the stack bottom address (%d)!",
+                        GPR[SP], GPR[FP]);
     }
 
     // Check that framep pointer < memory size
@@ -134,6 +143,7 @@ void load_globals(BOFFILE bof, BOFHeader header)
 {
     // Length of global data is the number of global data values.
     num_globals = header.data_length;
+    if (DEBUG) printf("DEBUG: data length in load_globals is %d\n", header.data_length);
 
     // Use data start address to find where in the array to
     // start saving global data to.
@@ -174,8 +184,11 @@ void print_all_instrs(FILE* out)
 
 void print_global_data(FILE* out)
 {
+    if (DEBUG) printf("DEBUG: print global data function is running!\n");
 	int global_start = GPR[GP];
 	int global_end = global_start + num_globals;
+    if (DEBUG) printf("DEBUG: num_globals is %d\n", num_globals);
+    // num_globals is 0, it shouldn't be
 	
 	int num_chars = 0;
 	bool no_dots_yet = true;
@@ -205,19 +218,29 @@ void print_global_data(FILE* out)
 
 void trace_instruction(bin_instr_t instr)
 {
-    //Print PC
-    printf("PC: %d\n", PC);
+    //Print current instruction
+    printf("==>      %d: %s\n", PC - 1, instruction_assembly_form(PC - 1, instr));
+
+    // Print VM state
+    print_state();
+}
+
+void print_state()
+{
+    //Print PC with HI and LO registers if necessary.
+    if (HI == 0 && LO == 0) printf("      PC: %d\n", PC);
+    else printf("      PC: %d   HI: %d   LO: %d\n", PC, HI, LO);
 
     //Print GPRs
-    printf("GPR[$gp]: %d GPR[$sp]: %d GPR[$fp]: %d GPR[$r3]: %d GPR[$r4]: %d\n", GPR[0], GPR[SP], GPR[FP], GPR[3], GPR[4]);
-    printf("GPR[$r5]: %d GPR[$r6]: %d GPR[$ra]: %d\n", GPR[5], GPR[6], GPR[RA]);
+    printf("GPR[$gp]: %d   GPR[$sp]: %d   GPR[$fp]: %d   GPR[$r3]: %d   GPR[$r4]: %d\n", GPR[0], GPR[SP], GPR[FP], GPR[3], GPR[4]);
+    printf("GPR[$r5]: %d   GPR[$r6]: %d   GPR[$ra]: %d\n", GPR[5], GPR[6], GPR[RA]);
 
     //Print Memory
     printf("%d: %d ...\n", GPR[GP], memory.words[GPR[GP]]);
     printf("%d: %d\n", GPR[SP], memory.words[GPR[SP]]);
 
-    //Print Current Instruction
-    printf("==> %d: %s\n", PC - 1, instruction_assembly_form(PC - 1, instr));
+    // Print newline
+    printf("\n");
 }
 
 bin_instr_t fetch_instruction()
@@ -397,6 +420,7 @@ void execute_instruction(bin_instr_t instr, bool trace_flag)
         break;
 
         case immed_instr_type:
+
             switch (instr.immed.op) 
             {
                 case ADDI_O:
@@ -498,6 +522,7 @@ void execute_instruction(bin_instr_t instr, bool trace_flag)
             switch(code) 
             {
                 case exit_sc:
+                    printf("==>      %d: %s\n", PC - 1, instruction_assembly_form(PC - 1, instr));
                     exit(machine_types_sgnExt(o));
                     break;
 
@@ -532,5 +557,25 @@ void execute_instruction(bin_instr_t instr, bool trace_flag)
         case error_instr_type:
             bail_with_error("Opcode (%hu) is invalid!", instr.comp.op);
             break;
+    }
+}
+
+void vm_run_program(bool trace_flag)
+{
+    if (trace_flag)
+    {
+        print_state();
+    }
+
+    invariant_check();
+
+    bin_instr_t cur_instr;
+
+    while (true)
+    {
+        cur_instr = fetch_instruction();
+        execute_instruction(cur_instr, trace_flag);
+        trace_instruction(cur_instr);
+        invariant_check();
     }
 }
