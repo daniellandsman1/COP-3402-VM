@@ -397,36 +397,78 @@ void execute_instruction(bin_instr_t instr, bool trace_flag)
         break;
 
         case immed_instr_type:
-
             switch (instr.immed.op) 
             {
                 case ADDI_O:
-                    GPR[instr.immed.reg] += machine_types_sgnExt(instr.immed.immed);
+                    memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
+                    (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) +
+                    machine_types_sgnExt(instr.immed.immed);
                     break;
 
                 case ANDI_O:
-                    GPR[instr.immed.reg] &= machine_types_zeroExt(instr.immed.immed);
+                    memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
+                    (memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) &
+                    machine_types_zeroExt(instr.immed.immed);
                     break;
 
-                case BNE_O:
-                    if (GPR[instr.immed.reg] != GPR[SP]) 
-                    {
-                        PC += machine_types_formOffset(instr.immed.immed);
-                    }
+                case BORI_O:
+                    memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
+                    (memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) |
+                    machine_types_zeroExt(instr.immed.immed);
+                    break;
+
+                case XORI_O:
+                    memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
+                    (memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) ^
+                    machine_types_zeroExt(instr.immed.immed);
                     break;
 
                 case BEQ_O:
-                    if (GPR[instr.immed.reg] == GPR[SP]) 
+                    if (memory.words[GPR[SP]] == memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)])
                     {
-                        PC += machine_types_formOffset(instr.immed.immed);
+                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
                     }
                     break;
 
-                // Other immediate instructions (BORI, XORI, etc.)
+                case BGEZ_O:
+                    if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] >= 0)
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                    }
+                    break;
+
+                case BGTZ_O:
+                    if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] > 0)
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                    }
+                    break;
+
+                case BLEZ_O:
+                    if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] <= 0)
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                    }
+                    break;
+
+                case BLTZ_O:
+                    if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] < 0)
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                    }
+                    break;
+
+                case BNE_O:
+                    if (memory.words[GPR[SP]] != memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)])
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                    }
+                    break;
+
                 default:
                     bail_with_error("Immediate instruction opcode (%d) is invalid!", instr.immed.op);
             }
-        break;
+            break;
 
         case jump_instr_type:
 
