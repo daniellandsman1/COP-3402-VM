@@ -649,7 +649,7 @@ void execute_instruction(bin_instr_t instr)
                     break;
 
                 default:
-                    bail_with_error("System call instruction opcode (%d) is invalid!", instr.syscall.op);
+                    bail_with_error("System call instruction code (%d) is invalid!", instr.syscall.code);
             }
         break;
 
