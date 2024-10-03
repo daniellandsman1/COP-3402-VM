@@ -191,42 +191,67 @@ void print_global_data(FILE* out)
     int num_chars = 0;
     bool printing_dots = false;
     
-    char* dots = "..."; // Made dots into a string so it can be formatted with the %8. Not sure if necessary but makes it fit expected output closer ************************
+    const char* dots = "...";  // String for dots
 
     for (int i = global_start; i <= global_end; i++)
     {
         if (memory.words[i] != 0)
         {
-            if (printing_dots) // Removed newline here to make up for the ones added in the if (!printing_dots) function ************************
+            if (printing_dots)
             {
-                num_chars = 0;
+                num_chars = 0;  // Reset num_chars when switching from dots to numbers
                 printing_dots = false;
             }
+
+            // Check length of the string that would be printed
+            int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
+
+            if (num_chars + len > MAX_PRINT_WIDTH)
+            {
+                newline(out);  // Print newline if the line exceeds the max width
+                num_chars = 0;  // Reset num_chars
+            }
+
             num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
         }
         else
         {
             if (!printing_dots)
             {
-                //printf("HEY! i + 1 is %d AND NEXT MEM IS %d\n", i + 1, memory.words[i+1]);
-                //printf("GLOBAL END IS %d\n", global_end);
-                if (memory.words[i + 1] == 0) // Added a check to possibly prevent index out of bounds ************************
+                if (memory.words[i + 1] == 0 && i + 1 <= global_end)
                 {
-                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]); // Removed the dots for a reason explained below ************************
-                    if (num_chars > MAX_PRINT_WIDTH) // Some test cases had ... surpass MAX_PRINT_WIDTH but didn't put it on a new line. This should fix that ************************
+                    // Print the last zero value
+                    int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
+                    
+                    if (num_chars + len > MAX_PRINT_WIDTH)
                     {
                         newline(out);
                         num_chars = 0;
                     }
-                    
-                    // Not sure about the spaces after the dots, hardcoded to work for test 0
-                    // but may not work for other tests.
-                    fprintf(out, "%11s     ", dots); // Adjusted spacing of ... to better fit the format of the test cases. Might still need to do some work on spacing dots and numbers but might just be that the test case examples look off from how it should actually be. ************************
-                    //newline(out); // In test1 where only the dots go to the new line, it didn't print a newline after the dots since the loop ends. this should fix it ******************
+
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+
+                    if (num_chars > MAX_PRINT_WIDTH)
+                    {
+                        newline(out);
+                        num_chars = 0;
+                    }
+
+                    // Print dots
+                    fprintf(out, "%11s     ", dots);
                     printing_dots = true;
+                    num_chars = 0;  // Reset after printing dots
                 }
                 else
                 {
+                    int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
+                    
+                    if (num_chars + len > MAX_PRINT_WIDTH)
+                    {
+                        newline(out);
+                        num_chars = 0;
+                    }
+
                     num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
                 }
             }
@@ -239,10 +264,10 @@ void print_global_data(FILE* out)
         }
     }
 
-    // if (num_chars > 0)
-    // {
-    //     newline(out);
-    // }
+    if (num_chars > 0)
+    {
+        newline(out);  // Ensure a final newline if there's leftover content
+    }
 }
 
 void print_AR(FILE* out)
