@@ -184,36 +184,51 @@ void print_all_instrs(FILE* out)
 
 void print_global_data(FILE* out)
 {
-    if (DEBUG) printf("DEBUG: print global data function is running!\n");
-	int global_start = GPR[GP];
-	int global_end = global_start + num_globals;
-    if (DEBUG) printf("DEBUG: num_globals is %d\n", num_globals);
-    // num_globals is 0, it shouldn't be
-	
-	int num_chars = 0;
-	bool no_dots_yet = true;
-	
-	for (int i = global_start; i < global_end; i++)
-	{
-		if (memory.words[i] != 0)
-		{
-			num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
-			no_dots_yet = true;
-		} else
-		{
-			if (no_dots_yet)
-			{
-				num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
-				num_chars += fprintf(out, "...");
-				no_dots_yet = false;
-			}
-		}
-		if (num_chars > MAX_PRINT_WIDTH)
-		{
-			newline(out);
-			num_chars = 0;
-		}
-	}
+    int global_start = GPR[GP];
+    int global_end = global_start + num_globals;
+    
+    int num_chars = 0;
+    bool printing_dots = false;
+    
+    for (int i = global_start; i < global_end; i++)
+    {
+        if (memory.words[i] != 0)
+        {
+            if (printing_dots)
+            {
+                newline(out);
+                num_chars = 0;
+                printing_dots = false;
+            }
+            num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+        }
+        else
+        {
+            if (!printing_dots)
+            {
+                if (i + 1 < global_end && memory.words[i + 1] == 0)
+                {
+                    num_chars += fprintf(out, "%8d: %d\t...", i, memory.words[i]);
+                    printing_dots = true;
+                }
+                else
+                {
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+                }
+            }
+        }
+        
+        if (num_chars > MAX_PRINT_WIDTH)
+        {
+            newline(out);
+            num_chars = 0;
+        }
+    }
+    
+    if (num_chars > 0)
+    {
+        newline(out);
+    }
 }
 
 void trace_instruction(bin_instr_t instr)
