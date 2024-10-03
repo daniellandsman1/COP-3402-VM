@@ -247,8 +247,7 @@ void print_global_data(FILE* out)
 
 void print_AR(FILE* out)
 {
-    // MAYBE
-    printf("\n");
+    fprintf(out, "\n");
 
     int AR_start = GPR[SP];
     int AR_end = GPR[FP];
@@ -256,14 +255,13 @@ void print_AR(FILE* out)
     int num_chars = 0;
     bool printing_dots = false;
     
-    char* dots = "..."; // Made dots into a string so it can be formatted with the %8. Not sure if necessary but makes it fit expected output closer ************************
-
     for (int i = AR_start; i <= AR_end; i++)
     {
-        if (memory.words[i] != 0)
+        if (memory.words[i] != 0 || i == AR_start || i == AR_end)
         {
-            if (printing_dots) // Removed newline here to make up for the ones added in the if (!printing_dots) function ************************
+            if (printing_dots)
             {
+                fprintf(out, "\n");
                 num_chars = 0;
                 printing_dots = false;
             }
@@ -273,17 +271,15 @@ void print_AR(FILE* out)
         {
             if (!printing_dots)
             {
-                if (i + 1 <= GPR[FP] && memory.words[i + 1] == 0) // Added a check to possibly prevent index out of bounds ************************
+                if (i + 1 <= AR_end && memory.words[i + 1] == 0)
                 {
-                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]); // Removed the dots for a reason explained below ************************
-                    if (num_chars > MAX_PRINT_WIDTH) // Some test cases had ... surpass MAX_PRINT_WIDTH but didn't put it on a new line. This should fix that ************************
+                    if (num_chars > MAX_PRINT_WIDTH)
                     {
-                        newline(out);
+                        fprintf(out, "\n");
                         num_chars = 0;
                     }
                     
-                    fprintf(out, "%11s", dots); // Adjusted spacing of ... to better fit the format of the test cases. Might still need to do some work on spacing dots and numbers but might just be that the test case examples look off from how it should actually be. ************************
-                    newline(out); // In test1 where only the dots go to the new line, it didn't print a newline after the dots since the loop ends. this should fix it ******************
+                    num_chars += fprintf(out, "%8s", "...");
                     printing_dots = true;
                 }
                 else
@@ -295,14 +291,14 @@ void print_AR(FILE* out)
 
         if (num_chars > MAX_PRINT_WIDTH)
         {
-            newline(out);
+            fprintf(out, "\n");
             num_chars = 0;
         }
     }
 
     if (num_chars > 0)
     {
-        newline(out);
+        fprintf(out, "\n");
     }
 }
 
