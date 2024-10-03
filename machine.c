@@ -190,14 +190,15 @@ void print_global_data(FILE* out)
 
     int num_chars = 0;
     bool printing_dots = false;
+    
+    char* dots = "..."; // Made dots into a string so it can be formatted with the %8. Not sure if necessary but makes it fit expected output closer ************************
 
     for (int i = global_start; i <= global_end; i++)
     {
         if (memory.words[i] != 0)
         {
-            if (printing_dots)
+            if (printing_dots) // Removed newline here to make up for the ones added in the if (!printing_dots) function ************************
             {
-                newline(out);
                 num_chars = 0;
                 printing_dots = false;
             }
@@ -209,9 +210,17 @@ void print_global_data(FILE* out)
             {
                 //printf("HEY! i + 1 is %d AND NEXT MEM IS %d\n", i + 1, memory.words[i+1]);
                 //printf("GLOBAL END IS %d\n", global_end);
-                if (memory.words[i + 1] == 0)
+                if (memory.words[i + 1] == 0) // Added a check to possibly prevent index out of bounds ************************
                 {
-                    num_chars += fprintf(out, "%8d: %d\n\t\t...", i, memory.words[i]);
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]); // Removed the dots for a reason explained below ************************
+                    if (num_chars > MAX_PRINT_WIDTH) // Some test cases had ... surpass MAX_PRINT_WIDTH but didn't put it on a new line. This should fix that ************************
+                    {
+                        newline(out);
+                        num_chars = 0;
+                    }
+                    
+                    fprintf(out, "%11s", dots); // Adjusted spacing of ... to better fit the format of the test cases. Might still need to do some work on spacing dots and numbers but might just be that the test case examples look off from how it should actually be. ************************
+                    newline(out); // In test1 where only the dots go to the new line, it didn't print a newline after the dots since the loop ends. this should fix it ******************
                     printing_dots = true;
                 }
                 else
@@ -297,12 +306,19 @@ void trace_instruction(bin_instr_t instr)
 void print_state()
 {
     //Print PC with HI and LO registers if necessary.
-    if (HI == 0 && LO == 0) printf("      PC: %d\n", PC);
-    else printf("      PC: %d   HI: %d   LO: %d\n", PC, HI, LO);
+    if (HI == 0 && LO == 0) printf("%8s: %d\n", "PC", PC);
+    else printf("%8s: %d   HI: %d   LO: %d\n", "PC", PC, HI, LO);
 
     //Print GPRs
-    printf("GPR[$gp]: %d   GPR[$sp]: %d   GPR[$fp]: %d   GPR[$r3]: %d   GPR[$r4]: %d\n", GPR[0], GPR[SP], GPR[FP], GPR[3], GPR[4]);
-    printf("GPR[$r5]: %d   GPR[$r6]: %d   GPR[$ra]: %d\n", GPR[5], GPR[6], GPR[RA]);
+
+    // Top row
+    printf("GPR[%s]: %-5d GPR[%s]: %-5d GPR[%s]: %-5d GPR[%s]: %-5d GPR[%s]: %-5d\n", 
+            regname_get(GP), GPR[GP], regname_get(SP), GPR[SP], regname_get(FP), GPR[FP],
+            regname_get(3), GPR[3], regname_get(4), GPR[4]);
+
+    // Bottom row
+    printf("GPR[%s]: %-5d GPR[%s]: %-5d GPR[%s]: %-5d\n",
+    regname_get(5), GPR[5], regname_get(6), GPR[6], regname_get(RA), GPR[RA]);
 
     //Print Memory
     print_global_data(stdout);
@@ -343,37 +359,37 @@ void execute_instruction(bin_instr_t instr)
 
                 case ADD_F:
                     memory.words[GPR[t] + machine_types_formOffset(ot)] = 
-                    memory.words[GPR[SP]] + (memory.words[GPR[s]] + machine_types_formOffset(os));
+                    memory.words[GPR[SP]] + (memory.words[GPR[s] + machine_types_formOffset(os)]);
                     break;
 
                 case SUB_F:
                     memory.words[GPR[t] + machine_types_formOffset(ot)] = 
-                    memory.words[GPR[SP]] - (memory.words[GPR[s]] + machine_types_formOffset(os));
+                    memory.words[GPR[SP]] - (memory.words[GPR[s] + machine_types_formOffset(os)]);
                     break;
 
                 case CPW_F:
                     memory.words[GPR[t] + machine_types_formOffset(ot)] = 
-                    memory.words[GPR[s]] + machine_types_formOffset(os);
+                    memory.words[GPR[s] + machine_types_formOffset(os)];
                     break;
 
                 case AND_F:
                     memory.uwords[GPR[t] + machine_types_formOffset(ot)] =
-                    memory.uwords[GPR[SP]] & (memory.uwords[GPR[s]] + machine_types_formOffset(os));
+                    memory.uwords[GPR[SP]] & (memory.uwords[GPR[s] + machine_types_formOffset(os)]);
                     break;
 
                 case BOR_F:
                     memory.uwords[GPR[t] + machine_types_formOffset(ot)] =
-                    memory.uwords[GPR[SP]] | (memory.uwords[GPR[s]] + machine_types_formOffset(os));
+                    memory.uwords[GPR[SP]] | (memory.uwords[GPR[s] + machine_types_formOffset(os)]);
                     break;
 
                 case NOR_F:
                     memory.uwords[GPR[t] + machine_types_formOffset(ot)] =
-                    ~(memory.uwords[GPR[SP]] | (memory.uwords[GPR[s]] + machine_types_formOffset(os)));
+                    ~(memory.uwords[GPR[SP]] | (memory.uwords[GPR[s] + machine_types_formOffset(os)]));
                     break;
 
                 case XOR_F:
                     memory.uwords[GPR[t] + machine_types_formOffset(ot)] =
-                    memory.uwords[GPR[SP]] ^ (memory.uwords[GPR[s]] + machine_types_formOffset(os));
+                    memory.uwords[GPR[SP]] ^ (memory.uwords[GPR[s] + machine_types_formOffset(os)]);
                     break;
 
                 case LWR_F:
