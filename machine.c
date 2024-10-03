@@ -247,7 +247,7 @@ void print_global_data(FILE* out)
 
 void print_AR(FILE* out)
 {
-    fprintf(out, "\n");
+    printf("\n");
 
     int AR_start = GPR[SP];
     int AR_end = GPR[FP];
@@ -261,7 +261,6 @@ void print_AR(FILE* out)
         {
             if (printing_dots)
             {
-                fprintf(out, "\n");
                 num_chars = 0;
                 printing_dots = false;
             }
@@ -273,13 +272,14 @@ void print_AR(FILE* out)
             {
                 if (i + 1 <= AR_end && memory.words[i + 1] == 0)
                 {
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
                     if (num_chars > MAX_PRINT_WIDTH)
                     {
-                        fprintf(out, "\n");
+                        newline(out);
                         num_chars = 0;
                     }
                     
-                    num_chars += fprintf(out, "%8s", "...");
+                    fprintf(out, "...");
                     printing_dots = true;
                 }
                 else
@@ -291,14 +291,14 @@ void print_AR(FILE* out)
 
         if (num_chars > MAX_PRINT_WIDTH)
         {
-            fprintf(out, "\n");
+            newline(out);
             num_chars = 0;
         }
     }
 
     if (num_chars > 0)
     {
-        fprintf(out, "\n");
+        newline(out);
     }
 }
 
