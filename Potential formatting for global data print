@@ -1,0 +1,59 @@
+void print_global_data(FILE* out)
+{
+    int global_start = GPR[GP];
+    int global_end = global_start + num_globals;
+
+    int num_chars = 0;
+    bool printing_dots = false;
+    
+    char* dots = "..."; // Made dots into a string so it can be formatted with the %8. Not sure if necessary but makes it fit expected output closer ************************
+
+    for (int i = global_start; i <= global_end; i++)
+    {
+        if (memory.words[i] != 0)
+        {
+            if (printing_dots) // Removed newline here to make up for the ones added in the if (!printing_dots) function ************************
+            {
+                num_chars = 0;
+                printing_dots = false;
+            }
+            num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+        }
+        else
+        {
+            if (!printing_dots)
+            {
+                //printf("HEY! i + 1 is %d AND NEXT MEM IS %d\n", i + 1, memory.words[i+1]);
+                //printf("GLOBAL END IS %d\n", global_end);
+                if (memory.words[i + 1] == 0) // Added a check to possibly prevent index out of bounds ************************
+                {
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]); // Removed the dots for a reason explained below ************************
+                    if (num_chars > MAX_PRINT_WIDTH) // Some test cases had ... surpass MAX_PRINT_WIDTH but didn't put it on a new line. This should fix that ************************
+                    {
+                        newline(out);
+                        num_chars = 0;
+                    }
+                    
+                    fprintf(out, "%8s", dots); // Adjusted spacing of ... to better fit the format of the test cases. Might still need to do some work on spacing dots and numbers but might just be that the test case examples look off from how it should actually be. ************************
+                    newline(out); // In test1 where only the dots go to the new line, it didn't print a newline after the dots since the loop ends. this should fix it ******************
+                    printing_dots = true;
+                }
+                else
+                {
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+                }
+            }
+        }
+
+        if (num_chars > MAX_PRINT_WIDTH)
+        {
+            newline(out);
+            num_chars = 0;
+        }
+    }
+
+    if (num_chars > 0)
+    {
+        newline(out);
+    }
+}
