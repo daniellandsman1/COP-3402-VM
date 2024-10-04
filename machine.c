@@ -190,32 +190,31 @@ void print_global_data(FILE* out)
 
     int num_chars = 0;
     bool printing_dots = false;
-    
     const char* dots = "...";  // String for dots
 
     for (int i = global_start; i <= global_end; i++)
     {
         if (memory.words[i] != 0)
         {
+            // Reset num_chars and printing_dots if switching from dots to numbers
             if (printing_dots)
             {
-                num_chars = 0;  // Reset num_chars when switching from dots to numbers
+                num_chars = 0;
                 printing_dots = false;
             }
 
-            
-
-            num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+            // Print the memory value with fixed-width formatting
+            num_chars += fprintf(out, "%8d: %-8d", i, memory.words[i]);
         }
         else
         {
+            // Check if we should start printing dots
             if (!printing_dots)
             {
+                // If the next value is also 0 and we're not at the end, start printing dots
                 if (memory.words[i + 1] == 0 && i + 1 <= global_end)
                 {
-                    
-
-                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+                    num_chars += fprintf(out, "%8d: %-8d", i, memory.words[i]);
 
                     if (num_chars > MAX_PRINT_WIDTH)
                     {
@@ -223,19 +222,19 @@ void print_global_data(FILE* out)
                         num_chars = 0;
                     }
 
-                    // Print dots
-                    num_chars += fprintf(out, "%11s     ", dots);
+                    // Print dots for the upcoming sequence of zeros
+                    num_chars += fprintf(out, "%11s", dots);
                     printing_dots = true;
                 }
                 else
                 {
-                    
-
-                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+                    // Otherwise, just print the single zero without starting dots
+                    num_chars += fprintf(out, "%8d: %-8d", i, memory.words[i]);
                 }
             }
         }
 
+        // Add a newline if we reach the max print width
         if (num_chars >= MAX_PRINT_WIDTH)
         {
             newline(out);
@@ -243,13 +242,11 @@ void print_global_data(FILE* out)
         }
     }
 
-    /*
-    if (num_chars >= 0)
+    // Ensure final newline if there's leftover content
+    if (num_chars > 0)
     {
-        newline(out);  // Ensure a final newline if there's leftover content
+        newline(out);
     }
-    */
-    
 }
 
 void print_AR(FILE* out)
