@@ -1,3 +1,9 @@
+// Daniel Landsman
+// Michael John
+// Christian Morton
+// Ryan Rohan
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,13 +13,11 @@
 #include "instruction.h"
 #include "utilities.h"
 
-// we can remove all this debug stuff when we're done
+
 #define DEBUG 0
 
-// we can remove this after we're done
 void testPrint(int argcP, char* argvP[]);
 
-//bool trace_program = true;
 bool print_assembly = false;
 
 int main(int argc, char* argv[])
