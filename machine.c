@@ -243,10 +243,13 @@ void print_global_data(FILE* out)
         }
     }
 
+    /*
     if (num_chars >= 0)
     {
         newline(out);  // Ensure a final newline if there's leftover content
     }
+    */
+    
 }
 
 void print_AR(FILE* out)
