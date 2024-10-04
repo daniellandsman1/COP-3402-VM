@@ -190,7 +190,7 @@ void print_global_data(FILE* out)
 
     int num_chars = 0;
     bool printing_dots = false;
-
+    
     const char* dots = "...";  // String for dots
 
     for (int i = global_start; i <= global_end; i++)
@@ -203,14 +203,7 @@ void print_global_data(FILE* out)
                 printing_dots = false;
             }
 
-            // Check length of the string that would be printed
-            int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
-
-            if (num_chars + len > MAX_PRINT_WIDTH)
-            {
-                newline(out);  // Print newline if the line exceeds the max width
-                num_chars = 0;  // Reset num_chars
-            }
+            
 
             num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
         }
@@ -220,50 +213,39 @@ void print_global_data(FILE* out)
             {
                 if (memory.words[i + 1] == 0 && i + 1 <= global_end)
                 {
-                    // Print the last zero value
-                    int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
-
-                    if (num_chars + len > MAX_PRINT_WIDTH)
-                    {
-                        newline(out);
-                        num_chars = 0;
-                    }
+                    
 
                     num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
 
-                    // Print dots
-                    fprintf(out, "%11s     ", dots);
-                    printing_dots = true;
-                    num_chars = 0;  // Reset after printing dots
-                }
-                else
-                {
-                    // Print zeros
-                    int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
-
-                    if (num_chars + len > MAX_PRINT_WIDTH)
+                    if (num_chars > MAX_PRINT_WIDTH)
                     {
                         newline(out);
                         num_chars = 0;
                     }
+
+                    // Print dots
+                    num_chars += fprintf(out, "%11s     ", dots);
+                    printing_dots = true;
+                }
+                else
+                {
+                    
 
                     num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
                 }
             }
         }
 
-        // Ensure num_chars is correctly updated and doesn't prematurely print a newline
-        if (num_chars > MAX_PRINT_WIDTH)
+        if (num_chars >= MAX_PRINT_WIDTH)
         {
             newline(out);
             num_chars = 0;
         }
     }
 
-    // Ensure final newline only if there's leftover content
-    if (num_chars > 0)
+    if (num_chars >= 0)
     {
-        newline(out);
+        newline(out);  // Ensure a final newline if there's leftover content
     }
 }
 
@@ -538,71 +520,73 @@ void execute_instruction(bin_instr_t instr)
 
         case immed_instr_type:
 
+            uword_type immediate = instr.immed.immed & 0xffff;
+
             switch (instr.immed.op) 
             {
                 case ADDI_O:
                     memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
                     (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) +
-                    machine_types_sgnExt(instr.immed.immed);
+                    machine_types_sgnExt(immediate); //instr.immed.immed
                     break;
 
                 case ANDI_O:
                     memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
                     (memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) &
-                    machine_types_zeroExt(instr.immed.immed);
+                    machine_types_zeroExt(immediate); //instr.immed.immed
                     break;
 
                 case BORI_O:
                     memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
                     (memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) |
-                    machine_types_zeroExt(instr.immed.immed);
+                    machine_types_zeroExt(immediate); //instr.immed.immed
                     break;
 
                 case XORI_O:
                     memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
                     (memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) ^
-                    machine_types_zeroExt(instr.immed.immed);
+                    machine_types_zeroExt(immediate); //instr.immed.immed
                     break;
 
                 case BEQ_O:
                     if (memory.words[GPR[SP]] == memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)])
                     {
-                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
                     }
                     break;
 
                 case BGEZ_O:
                     if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] >= 0)
                     {
-                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
                     }
                     break;
 
                 case BGTZ_O:
                     if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] > 0)
                     {
-                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
                     }
                     break;
 
                 case BLEZ_O:
                     if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] <= 0)
                     {
-                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
                     }
                     break;
 
                 case BLTZ_O:
                     if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] < 0)
                     {
-                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
                     }
                     break;
 
                 case BNE_O:
                     if (memory.words[GPR[SP]] != memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)])
                     {
-                        PC = (PC - 1) + machine_types_formOffset(instr.immed.immed);
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
                     }
                     break;
 
@@ -649,6 +633,11 @@ void execute_instruction(bin_instr_t instr)
                 case print_str_sc:
                     memory.words[GPR[SP]] = 
                     printf("%s", (char*)&memory.words[GPR[r] + machine_types_formOffset(o)]);
+                    break;
+                
+                case print_int_sc:
+                    memory.words[GPR[SP]] =
+                    printf("%d", memory.words[GPR[r] + machine_types_formOffset(o)]);
                     break;
 
                 case print_char_sc:
