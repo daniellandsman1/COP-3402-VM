@@ -1,51 +1,360 @@
-#include <stdio.h>
+// Daniel Landsman
 #include <stdlib.h>
-#include <string.h>
-#include "bof.h"
+#include "machine.h"
+#include "machine_types.h"
 #include "instruction.h"
-#include "utilities.h"
+#include "bof.h"
 #include "regname.h"
+#include "utilities.h"
 
-#define MEMORY_SIZE 32768
+#define MAX_PRINT_WIDTH 59
+#define DEBUG 0
 
-// this should go in the machine_main.c file
+union mem_u memory;
+word_type GPR[NUM_REGISTERS];
+address_type PC = 0;
+word_type HI = 0;
+word_type LO = 0;
+unsigned int num_instrs = 0;
+unsigned int num_globals = 0;
 bool trace_program = true;
+bool started_tracing = false;
 
-// Memory and registers
-union memory_t {
-    int words[MEMORY_SIZE];
-    unsigned int uwords[MEMORY_SIZE];
-    bin_instr_t instructions[MEMORY_SIZE];
-} memory;
+// Pre-Condition: bof represents a valid binary object file.
+// Post-Condition: Loads the file's instructions and global data
+// into memory and initializes registers.
+void load_bof(BOFFILE bof) //
+{
 
-int PC = 0, HI = 0, LO = 0;
-int GPR[8]; // General-purpose registers
+    // Open header for reading
+    BOFHeader bHeader = bof_read_header(bof);
+    if (DEBUG) printf("DEBUG: bHeader data length in load_bof is %d\n", bHeader.data_length);
+    if (DEBUG) printf("DEBUG: bHeader data start address in load_bof is %d\n", bHeader.data_start_address);
+    if (DEBUG) printf("DEBUG: bHeader magic in load_bof is %s\n", bHeader.magic);
+    if (DEBUG) printf("DEBUG: bHeader stack bottom address in load_bof is %d\n", bHeader.stack_bottom_addr);
+    if (DEBUG) printf("DEBUG: bHeader text length in load_bof is %d\n", bHeader.text_length);
+    if (DEBUG) printf("DEBUG: bHeader text start address in load_bof is %d\n", bHeader.text_start_address);
 
-//Register names for tracing
-const char * reg_names[8] = {"$gp", "$sp", "$fp", "$r3", "$r4", "$r5", "$r6", "$ra"};
+    // Initialize registers and memory
+    init(bHeader);
 
-// VM print function (-p flag)
-void vm_print_program(const char* bof_file) {
-    BOFFILE bof = bof_read_open(bof_file);
-    if (bof.fileptr == NULL) { // Already checked in bof_read_open.
-        fprintf(stderr, "Error opening BOF file: %s\n", bof_file);
-        exit(1);
+    // Check to make sure everything was initialized properly.
+    invariant_check(bHeader);
+
+    // Load program instructions
+    load_instrs(bof, bHeader);
+
+    // Load program global data
+    load_globals(bof, bHeader);
+
+}
+
+// Pre-Condition: header represents a valid BOF header.
+// Post-Condition: Initializes memory to 0 and sets registers
+// to their proper starting values according to the header.
+void init(BOFHeader header) {
+
+    // Set all registers to 0
+    for (int i = 0; i < NUM_REGISTERS; i++)
+    {
+        GPR[i] = 0;
     }
-    BOFHeader header = bof_read_header(bof);
 
-    // Load and print instructions
-    for (int i = 0; i < header.text_length; i++) {
-        bin_instr_t instr;
-        instruction_read(bof);
-        printf("%d: ", i);
-        instruction_print_assembly(stdout, &instr);
+    // Set all memory to 0
+    for (int i = 0; i < MEMORY_SIZE_IN_WORDS; i++)
+    {
+        memory.words[i] = 0;
     }
 
-    bof_close(bof);
+    // Set GP, FP, and SP registers appropriately
+    GPR[GP] = header.data_start_address;
+    GPR[FP] = GPR[SP] = header.stack_bottom_addr;
+
+    // Properly initialize special registers
+    PC = header.text_start_address;
+    HI = 0;
+    LO = 0;
+}
+
+// Pre-Condition: Registers are properly initialized and updated.
+// Post-Condition: Checks the registers to make sure all invariants hold.
+void invariant_check()
+{
+    // Check if 0 is <= global pointer
+    if (!(0 <= GPR[GP]))
+    {
+        bail_with_error("Global data starting address (%d) is less than 0!",
+                        GPR[GP]);
+    }
+
+    // Check if global pointer < stack pointer
+    if (!(GPR[GP] < GPR[SP]))
+    {
+        bail_with_error("Global data starting address (%d) is not less than the stack top address (%d)!",
+                        GPR[GP], GPR[SP]);
+    }
+
+    // Check if stack pointer <= frame pointer
+    if (!(GPR[SP] <= GPR[FP]))
+    {
+        bail_with_error("Stack top address (%d) is not less than or equal to the stack bottom address (%d)!",
+                        GPR[SP], GPR[FP]);
+    }
+
+    // Check that framep pointer < memory size
+    if (!(GPR[FP] < MEMORY_SIZE_IN_WORDS))
+    {
+        bail_with_error("Stack bottom address (%d) is not less than the memory size (%d)!",
+                        GPR[FP], MEMORY_SIZE_IN_WORDS);
+    }
+
+    // Check that 0 <= program counter
+    if (!(0 <= PC))
+    {
+        bail_with_error("Program counter (%u) is less than zero!",
+                        PC);
+    }
+
+    // Check that program counter < memory size
+    if (!(PC < MEMORY_SIZE_IN_WORDS))
+    {
+        bail_with_error("Program counter (%u) is not less than the memory size (%d)!",
+                        PC, MEMORY_SIZE_IN_WORDS);
+    }
+
+    if (DEBUG) printf("Invariant check passed!\n");
+}
+
+// Pre-Condition: bof and header are a valid binary object file and header, respectively
+// Post-Condition: Loads instructions from the BOF into program memory
+void load_instrs(BOFFILE bof, BOFHeader header) 
+{
+    // Number of instructions is simply text length since word addressed.
+    num_instrs = header.text_length;
+
+    // Loop through number of instructions, adding to memory array
+    for (int i = 0; i < num_instrs; i++) 
+    {
+        memory.instrs[i] = instruction_read(bof);
+    }
+}
+
+// Pre-Condition: bof and header are a valid binary object file and header, respectively
+// Post-Condition: Loads global data from the BOF into program memory
+void load_globals(BOFFILE bof, BOFHeader header)
+{
+    // Length of global data is the number of global data values.
+    num_globals = header.data_length;
+    if (DEBUG) printf("DEBUG: data length in load_globals is %d\n", header.data_length);
+
+    // Use data start address to find where in the array to
+    // start saving global data to.
+    int offset = header.data_start_address;
+
+    // Loop through number of global data values, adding to memory array using offset.
+    for (int i = 0; i < num_globals; i++)
+    {
+        memory.words[i + offset] = bof_read_word(bof);
+    }
+}
+
+// Pre-Condition: Instructions and global data have been properly loaded
+// into program memory.
+// Post-Condition: Prints table heading, assembly instructions, and global
+// data in program without executing instructions (-p option).
+void vm_print_program(FILE* out)
+{
+    if (DEBUG) printf("DEBUG: printing table heading\n");
+    instruction_print_table_heading(out);
+    if (DEBUG) printf("DEBUG: printing instructions\n");
+    print_all_instrs(out);
+    if (DEBUG) printf("DEBUG: printing global data\n");
+    print_global_data(out);
+    // need to figure out how to print global data, see disasm files for some guidance
+    // and check .lst files for what we need to match
+}
+
+// Pre-Condition: Instructions have been properly loaded into program memory.
+// Post-Condition: Prints the address and assembly form of all instructions in memory.
+void print_all_instrs(FILE* out)
+{
+    for (int i = 0; i < num_instrs; i++)
+    {
+        instruction_print(out, i, memory.instrs[i]);
+    }
+}
+
+void print_global_data(FILE* out)
+{
+    int global_start = GPR[GP];
+    int global_end = GPR[SP] - 1;
+
+    int num_chars = 0;
+    bool printing_dots = false;
+    
+    const char* dots = "...";  // String for dots
+
+    for (int i = global_start; i <= global_end; i++)
+    {
+        if (memory.words[i] != 0)
+        {
+            if (printing_dots)
+            {
+                num_chars = 0;  // Reset num_chars when switching from dots to numbers
+                printing_dots = false;
+            }
+
+            
+
+            num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+        }
+        else
+        {
+            if (!printing_dots)
+            {
+                if (memory.words[i + 1] == 0 && i + 1 <= global_end)
+                {
+                    
+
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+
+                    if (num_chars > MAX_PRINT_WIDTH)
+                    {
+                        newline(out);
+                        num_chars = 0;
+                    }
+
+                    // Print dots
+                    num_chars += fprintf(out, "%11s     ", dots);
+                    printing_dots = true;
+                }
+                else
+                {
+                    
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+                }
+            }
+        }
+
+        if (num_chars >= MAX_PRINT_WIDTH)
+        {
+            newline(out);
+            num_chars = 0;
+        }
+    }
+
+    /*
+    if (num_chars >= 0)
+    {
+        newline(out);  // Ensure a final newline if there's leftover content
+    }
+    */
+    
+}
+
+void print_AR(FILE* out)
+{
+    printf("\n");
+
+    int AR_start = GPR[SP];
+    int AR_end = GPR[FP];
+
+    int num_chars = 0;
+    bool printing_dots = false;
+    
+    for (int i = AR_start; i <= AR_end; i++)
+    {
+        if (memory.words[i] != 0 || i == AR_start || i == AR_end)
+        {
+            if (printing_dots)
+            {
+                num_chars = 0;
+                printing_dots = false;
+            }
+            num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+        }
+        else
+        {
+            if (!printing_dots)
+            {
+                if (i + 1 <= AR_end && memory.words[i + 1] == 0)
+                {
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+                    if (num_chars > MAX_PRINT_WIDTH)
+                    {
+                        newline(out);
+                        num_chars = 0;
+                    }
+                    
+                    fprintf(out, "...");
+                    printing_dots = true;
+                }
+                else
+                {
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
+                }
+            }
+        }
+
+        if (num_chars > MAX_PRINT_WIDTH)
+        {
+            newline(out);
+            num_chars = 0;
+        }
+    }
+
+    if (num_chars > 0)
+    {
+        newline(out);
+    }
+}
+
+void trace_instruction(bin_instr_t instr)
+{
+    //Print current instruction
+    printf("==>      %d: %s\n", PC - 1, instruction_assembly_form(PC - 1, instr));
+
+    // Print VM state
+    print_state();
+}
+
+void print_state()
+{
+    //Print PC with HI and LO registers if necessary.
+    if (HI == 0 && LO == 0) printf("%8s: %d\n", "PC", PC);
+    else printf("%8s: %d   HI: %d   LO: %d\n", "PC", PC, HI, LO);
+
+    //Print GPRs
+
+    // Top row
+    printf("GPR[%s]: %-5d GPR[%s]: %-5d GPR[%s]: %-5d GPR[%s]: %-5d GPR[%s]: %-5d\n", 
+            regname_get(GP), GPR[GP], regname_get(SP), GPR[SP], regname_get(FP), GPR[FP],
+            regname_get(3), GPR[3], regname_get(4), GPR[4]);
+
+    // Bottom row
+    printf("GPR[%s]: %-5d GPR[%s]: %-5d GPR[%s]: %-5d\n",
+    regname_get(5), GPR[5], regname_get(6), GPR[6], regname_get(RA), GPR[RA]);
+
+    //Print Memory
+    print_global_data(stdout);
+    print_AR(stdout);
+    //printf("%d: %d ...\n", GPR[GP], memory.words[GPR[GP]]);
+    //printf("%d: %d\n", GPR[SP], memory.words[GPR[SP]]);
+
+    // Print newline
+    printf("\n");
+}
+
+bin_instr_t fetch_instruction()
+{
+    bin_instr_t instr = memory.instrs[PC];
+    PC++;
+    return instr;
 }
 
 // Fetch-execute cycle
-void execute_instruction(bin_instr_t instr) {
+void execute_instruction(bin_instr_t instr)
+{
 
     instr_type type = instruction_type(instr);
 
@@ -56,46 +365,46 @@ void execute_instruction(bin_instr_t instr) {
             offset_type ot = instr.comp.ot;
             reg_num_type s = instr.comp.rs;
             offset_type os = instr.comp.os;
-            func_type func = instr.comp.func;
+            func_type func_0 = instr.comp.func;
 
-            switch(func) {
+            switch(func_0) {
 
                 case NOP_F:
                     break;
 
                 case ADD_F:
                     memory.words[GPR[t] + machine_types_formOffset(ot)] = 
-                    memory.words[GPR[SP]] + (memory.words[GPR[s]] + machine_types_formOffset(os));
+                    memory.words[GPR[SP]] + (memory.words[GPR[s] + machine_types_formOffset(os)]);
                     break;
 
                 case SUB_F:
                     memory.words[GPR[t] + machine_types_formOffset(ot)] = 
-                    memory.words[GPR[SP]] - (memory.words[GPR[s]] + machine_types_formOffset(os));
+                    memory.words[GPR[SP]] - (memory.words[GPR[s] + machine_types_formOffset(os)]);
                     break;
 
                 case CPW_F:
                     memory.words[GPR[t] + machine_types_formOffset(ot)] = 
-                    memory.words[GPR[s]] + machine_types_formOffset(os);
+                    memory.words[GPR[s] + machine_types_formOffset(os)];
                     break;
 
                 case AND_F:
                     memory.uwords[GPR[t] + machine_types_formOffset(ot)] =
-                    memory.uwords[GPR[SP]] & (memory.uwords[GPR[s]] + machine_types_formOffset(os));
+                    memory.uwords[GPR[SP]] & (memory.uwords[GPR[s] + machine_types_formOffset(os)]);
                     break;
 
                 case BOR_F:
                     memory.uwords[GPR[t] + machine_types_formOffset(ot)] =
-                    memory.uwords[GPR[SP]] | (memory.uwords[GPR[s]] + machine_types_formOffset(os));
+                    memory.uwords[GPR[SP]] | (memory.uwords[GPR[s] + machine_types_formOffset(os)]);
                     break;
 
                 case NOR_F:
                     memory.uwords[GPR[t] + machine_types_formOffset(ot)] =
-                    ~(memory.uwords[GPR[SP]] | (memory.uwords[GPR[s]] + machine_types_formOffset(os)));
+                    ~(memory.uwords[GPR[SP]] | (memory.uwords[GPR[s] + machine_types_formOffset(os)]));
                     break;
 
                 case XOR_F:
                     memory.uwords[GPR[t] + machine_types_formOffset(ot)] =
-                    memory.uwords[GPR[SP]] ^ (memory.uwords[GPR[s]] + machine_types_formOffset(os));
+                    memory.uwords[GPR[SP]] ^ (memory.uwords[GPR[s] + machine_types_formOffset(os)]);
                     break;
 
                 case LWR_F:
@@ -132,10 +441,10 @@ void execute_instruction(bin_instr_t instr) {
             reg_num_type reg = instr.othc.reg;
             offset_type offset = instr.othc.offset;
             arg_type arg = instr.othc.arg;
-            func_type func = instr.othc.func;
+            func_type func_1 = instr.othc.func;
 
-            switch(func) {
-
+            switch(func_1) 
+            {
                 case LIT_F:
                     memory.words[GPR[reg] + machine_types_formOffset(offset)] =
                     machine_types_sgnExt(arg);
@@ -201,89 +510,163 @@ void execute_instruction(bin_instr_t instr) {
                     break;
 
                 case SYS_F:
-
-                    reg_num_type reg = instr.syscall.reg;
-                    offset_type o = instr.syscall.offset;
-                    syscall_type code = instruction_syscall_number(instr);
-
-                    switch(code) {
-
-                        case exit_sc:
-                            exit(machine_types_sgnExt(o));
-                            break;
-
-                        case print_str_sc:
-                            memory.words[GPR[SP]] = 
-                            printf("%s", (char*)&memory.words[GPR[reg] + machine_types_formOffset(o)]);
-                            break;
-
-                        case print_char_sc:
-                            memory.words[GPR[SP]] = 
-                            fputc(memory.words[GPR[reg] + machine_types_formOffset(o)], stdout);
-                            break;
-
-                        case read_char_sc:
-                            memory.words[GPR[reg] + machine_types_formOffset(o)] =
-                            getc(stdin);
-                            break;
-
-                        case start_tracing_sc:
-                            trace_program = true;
-                            break;
-
-                        case stop_tracing_sc:
-                            trace_program = false;
-                            break;
-                    }
+                    // Should never happen, all other computational instructions
+                    // with this func code should be returned as syscall_instr_type
+                    // by instruction_type() function.
                     break;
 
                 default:
                     bail_with_error("Other computational function code (%hu) is invalid!", instr.othc.func);
                     break;
             }
-
-            break;
+        break;
 
         case immed_instr_type:
-            switch (instr.immed.opcode) {
-                case OP_ADDI:
-                    GPR[instr.immed.reg] += machine_types_sgnExt(instr.immed.immed);
+
+            uword_type immediate = instr.immed.immed & 0xffff;
+
+            switch (instr.immed.op) 
+            {
+                case ADDI_O:
+                    memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
+                    (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) +
+                    machine_types_sgnExt(immediate); //instr.immed.immed
                     break;
-                case OP_ANDI:
-                    GPR[instr.immed.reg] &= machine_types_zeroExt(instr.immed.immed);
+
+                case ANDI_O:
+                    memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
+                    (memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) &
+                    machine_types_zeroExt(immediate); //instr.immed.immed
                     break;
-                case OP_BNE:
-                    if (GPR[instr.immed.reg] != GPR[SP]) {
-                        PC += machine_types_formOffset(instr.immed.immed);
+
+                case BORI_O:
+                    memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
+                    (memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) |
+                    machine_types_zeroExt(immediate); //instr.immed.immed
+                    break;
+
+                case XORI_O:
+                    memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] =
+                    (memory.uwords[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)]) ^
+                    machine_types_zeroExt(immediate); //instr.immed.immed
+                    break;
+
+                case BEQ_O:
+                    if (memory.words[GPR[SP]] == memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)])
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
                     }
                     break;
-                case OP_BEQ:
-                    if (GPR[instr.immed.reg] == GPR[SP]) {
-                        PC += machine_types_formOffset(instr.immed.immed);
+
+                case BGEZ_O:
+                    if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] >= 0)
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
                     }
                     break;
-                // Other immediate instructions (BORI, XORI, etc.)
+
+                case BGTZ_O:
+                    if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] > 0)
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
+                    }
+                    break;
+
+                case BLEZ_O:
+                    if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] <= 0)
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
+                    }
+                    break;
+
+                case BLTZ_O:
+                    if (memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)] < 0)
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
+                    }
+                    break;
+
+                case BNE_O:
+                    if (memory.words[GPR[SP]] != memory.words[GPR[instr.immed.reg] + machine_types_formOffset(instr.immed.offset)])
+                    {
+                        PC = (PC - 1) + machine_types_formOffset(immediate); //instr.immed.immed
+                    }
+                    break;
+
                 default:
-                    bail_with_error("Immediate instruction opcode (%d) is invalid!", instr.immed.opcode);
+                    bail_with_error("Immediate instruction opcode (%d) is invalid!", instr.immed.op);
             }
             break;
 
         case jump_instr_type:
-            switch(instr.jump.opcode) {
-                case JMPA:
-                    PC = formAddress(PC - 1, instr.jump.addr);
+
+            switch(instr.jump.op) 
+            {
+                case JMPA_O:
+                    PC = machine_types_formAddress(PC - 1, instr.jump.addr);
                     break;
-                case CALL:
+                case CALL_O:
                     GPR[RA] = PC;
-                    PC = formAddress(PC - 1, instr.jump.addr);
+                    PC = machine_types_formAddress(PC - 1, instr.jump.addr);
                     break;
-                case RTN:
+                case RTN_O:
                     PC = GPR[RA];
                     break;
                 default:
-                    bail_with_error("Jump instruction opcode (%d) is invalid!", instr.jump.opcode);
+                    bail_with_error("Jump instruction opcode (%d) is invalid!", instr.jump.op);
             }
-            break;
+        break;
+
+        case syscall_instr_type:
+
+            reg_num_type r = instr.syscall.reg;
+            offset_type o = instr.syscall.offset;
+            syscall_type code = instruction_syscall_number(instr);
+
+            switch(code) 
+            {
+                case exit_sc:
+                    if (trace_program)
+                    {
+                        printf("==>      %d: %s\n", PC - 1, instruction_assembly_form(PC - 1, instr));
+                    }
+                    exit(machine_types_sgnExt(o));
+                    break;
+
+                case print_str_sc:
+                    memory.words[GPR[SP]] = 
+                    printf("%s", (char*)&memory.words[GPR[r] + machine_types_formOffset(o)]);
+                    break;
+                
+                case print_int_sc:
+                    memory.words[GPR[SP]] =
+                    printf("%d", memory.words[GPR[r] + machine_types_formOffset(o)]);
+                    break;
+
+                case print_char_sc:
+                    memory.words[GPR[SP]] = 
+                    fputc(memory.words[GPR[r] + machine_types_formOffset(o)], stdout);
+                    break;
+
+                case read_char_sc:
+                    memory.words[GPR[r] + machine_types_formOffset(o)] =
+                    getc(stdin);
+                    break;
+
+                case start_tracing_sc:
+                    trace_program = true;
+                    started_tracing = true;
+                    break;
+
+                case stop_tracing_sc:
+                    trace_program = false;
+                    printf("==>      %d: %s\n", PC - 1, instruction_assembly_form(PC - 1, instr));
+                    break;
+
+                default:
+                    bail_with_error("System call instruction code (%d) is invalid!", instr.syscall.code);
+            }
+        break;
 
         case error_instr_type:
             bail_with_error("Opcode (%hu) is invalid!", instr.comp.op);
@@ -291,82 +674,23 @@ void execute_instruction(bin_instr_t instr) {
     }
 }
 
-// VM execution
-void vm_execute_program(const char* bof_file) {
-    BOFFILE bof = bof_read_open(bof_file);
-    if (!bof) {
-        fprintf(stderr, "Error opening BOF file: %s\n", bof_file);
-        exit(1);
+void vm_run_program()
+{
+    if (trace_program)
+    {
+        print_state();
     }
 
-    BOFHeader header;
-    bof_read_header(bof, &header);
+    invariant_check();
 
-    // Load instructions into memory
-    for (int i = 0; i < header.text_length; i++) {
-        instruction_read(bof, &memory.instructions[i]);
+    bin_instr_t cur_instr;
+
+    while (true)
+    {
+        cur_instr = fetch_instruction();
+        execute_instruction(cur_instr);
+        if (trace_program && started_tracing == false) trace_instruction(cur_instr);
+        started_tracing = false;
+        invariant_check();
     }
-    bof_close(bof);
-
-    // Execute program
-    while (1) {
-        instruction_t instr = memory.instructions[PC];
-        PC++;
-
-        //If tracing is enabled, print trace before executing instruction
-        if(trace_program){
-            trace_instruction(instr);
-        }
-        
-        execute_instruction(instr);
-
-        //If tracing is enabled, print trace after executing instruction
-        if(trace_program){
-            trace_instruction(instr);
-        }
-    }
-}
-
-bin_instr_t fetch_instruction(){
-    bin_instr_t instr = memory.instructions[PC];
-    PC++;
-    return instr;
-}
-
-void trace_instruction(bin_instr_t instr){
-
-    //Print PC
-    printf("PC: %d\n", PC);
-
-    //Print GPRs
-    printf("GPR[$gp]: %d GPR[$sp]: %d GPR[$fp]: %d GPR[$r3]: %d GPR[$r4]: %d\n", GPR[0], GPR[SP], GPR[FP], GPR[3], GPR[4]);
-    printf("GPR[$r5]: %d GPR[$r6]: %d GPR[$ra]: %d\n", GPR[5], GPR[6], GPR[RA]);
-
-    //Print Memory
-    printf("%d: %d ...\n", GPR[GP], memory.words[GPR[GP]]);
-    printf("%d: %d\n", GPR[SP], memory.words[GPR[SP]]);
-
-    //Print Current Instruction
-    printf("==> %d: ", PC - 1);
-    instruction_print_assembly(stdout, &instr);
-    printf("\n");
-}
-
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s [-p] <bof_file>\n", argv[0]);
-        return 1;
-    }
-
-    if (strcmp(argv[1], "-p") == 0) {
-        if (argc != 3) {
-            fprintf(stderr, "Usage: %s -p <bof_file>\n", argv[0]);
-            return 1;
-        }
-        vm_print_program(argv[2]);
-    } else {
-        vm_execute_program(argv[1]);
-    }
-
-    return 0;
 }
