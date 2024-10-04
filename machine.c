@@ -190,7 +190,7 @@ void print_global_data(FILE* out)
 
     int num_chars = 0;
     bool printing_dots = false;
-    
+
     const char* dots = "...";  // String for dots
 
     for (int i = global_start; i <= global_end; i++)
@@ -222,7 +222,7 @@ void print_global_data(FILE* out)
                 {
                     // Print the last zero value
                     int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
-                    
+
                     if (num_chars + len > MAX_PRINT_WIDTH)
                     {
                         newline(out);
@@ -231,12 +231,6 @@ void print_global_data(FILE* out)
 
                     num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
 
-                    if (num_chars > MAX_PRINT_WIDTH)
-                    {
-                        newline(out);
-                        num_chars = 0;
-                    }
-
                     // Print dots
                     fprintf(out, "%11s     ", dots);
                     printing_dots = true;
@@ -244,8 +238,9 @@ void print_global_data(FILE* out)
                 }
                 else
                 {
+                    // Print zeros
                     int len = snprintf(NULL, 0, "%8d: %d\t", i, memory.words[i]);
-                    
+
                     if (num_chars + len > MAX_PRINT_WIDTH)
                     {
                         newline(out);
@@ -257,6 +252,7 @@ void print_global_data(FILE* out)
             }
         }
 
+        // Ensure num_chars is correctly updated and doesn't prematurely print a newline
         if (num_chars > MAX_PRINT_WIDTH)
         {
             newline(out);
@@ -264,9 +260,10 @@ void print_global_data(FILE* out)
         }
     }
 
+    // Ensure final newline only if there's leftover content
     if (num_chars > 0)
     {
-        newline(out);  // Ensure a final newline if there's leftover content
+        newline(out);
     }
 }
 
