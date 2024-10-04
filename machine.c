@@ -183,6 +183,7 @@ void print_all_instrs(FILE* out)
     }
 }
 
+Fix the print global function so that the spacing matches the desired output.
 void print_global_data(FILE* out)
 {
     int global_start = GPR[GP];
@@ -203,7 +204,7 @@ void print_global_data(FILE* out)
                 printing_dots = false;
             }
 
-            num_chars += fprintf(out, "%8d: %-8d", i, memory.words[i]);
+            num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
         }
         else
         {
@@ -212,7 +213,7 @@ void print_global_data(FILE* out)
                 if (memory.words[i + 1] == 0 && i + 1 <= global_end)
                 {
 
-                    num_chars += fprintf(out, "%8d: %-8d", i, memory.words[i]);
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
 
                     if (num_chars > MAX_PRINT_WIDTH)
                     {
@@ -221,13 +222,13 @@ void print_global_data(FILE* out)
                     }
 
                     // Print dots
-                    num_chars += fprintf(out, "%11s", dots);
+                    num_chars += fprintf(out, "%11s     ", dots);
                     printing_dots = true;
                 }
                 else
                 {
 
-                    num_chars += fprintf(out, "%8d: %-8d", i, memory.words[i]);
+                    num_chars += fprintf(out, "%8d: %d\t", i, memory.words[i]);
                 }
             }
         }
@@ -239,12 +240,10 @@ void print_global_data(FILE* out)
         }
     }
 
-    /*
     if (num_chars >= 0)
     {
         newline(out);  // Ensure a final newline if there's leftover content
     }
-    */
 
 }
 
